@@ -21,7 +21,11 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-const defaultWordCount = 6
+const (
+	defaultPassphraseCount = 1
+	defaultWordCount       = 6
+	defaultInterval        = 5 * time.Second
+)
 
 const bannerArt = `
 ██████╗ ██╗ ██████╗███████╗██╗    ██╗ █████╗ ██████╗ ███████╗
@@ -32,8 +36,6 @@ const bannerArt = `
 ╚═════╝ ╚═╝ ╚═════╝╚══════╝ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝
 Diceware passphrase generator by hasteful 🐇`
 
-var defaultPhraseFG = lipgloss.Color("255")
-
 type theme struct {
 	container lipgloss.Style
 	banner    lipgloss.Style
@@ -42,6 +44,8 @@ type theme struct {
 	hint      lipgloss.Style
 	index     lipgloss.Style
 	phrase    lipgloss.Style
+	phraseFG  color.Color
+	fadeRamp  []color.Color
 }
 
 func newTheme() theme {
@@ -53,6 +57,15 @@ func newTheme() theme {
 		hint:      lipgloss.NewStyle().Foreground(lipgloss.Color("244")),
 		index:     lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")),
 		phrase:    lipgloss.NewStyle().Bold(true),
+		phraseFG:  lipgloss.Color("255"),
+		fadeRamp: []color.Color{
+			lipgloss.Color("255"),
+			lipgloss.Color("252"),
+			lipgloss.Color("249"),
+			lipgloss.Color("246"),
+			lipgloss.Color("243"),
+			lipgloss.Color("240"),
+		},
 	}
 }
 
@@ -66,10 +79,10 @@ type frame struct {
 }
 
 func main() {
-	wordlistPath := flag.String("i", "", "path to wordlist file (required)")
-	passphraseCount := flag.Int("n", 1, "number of passphrases to generate")
+	wordlistPath := flag.String("i", "", "path to wordlist file, or - for standard input (required)")
+	passphraseCount := flag.Int("n", defaultPassphraseCount, "number of passphrases to generate")
 	wordCount := flag.Int("w", defaultWordCount, "number of words per passphrase")
-	interval := flag.Duration("interval", 5*time.Second, "refresh interval in live mode")
+	interval := flag.Duration("interval", defaultInterval, "refresh interval in live mode")
 	once := flag.Bool("once", false, "generate once and exit")
 	plain := flag.Bool("plain", false, "print only the passphrases, one per line, and exit (implies -once)")
 	flag.Usage = usage
@@ -79,16 +92,16 @@ func main() {
 		fail(fmt.Errorf("unexpected argument: %s", strings.Join(flag.Args(), " ")))
 	}
 	if strings.TrimSpace(*wordlistPath) == "" {
-		fail(errors.New("missing required -i <wordlist-file>"))
+		fail(errors.New("missing required -i <wordlist-file|->"))
 	}
 	if *passphraseCount <= 0 {
-		fail(errors.New("invalid -n value; must be > 0"))
+		fail(errors.New("invalid -n value, must be > 0"))
 	}
 	if *wordCount <= 0 {
-		fail(errors.New("invalid -w value; must be > 0"))
+		fail(errors.New("invalid -w value, must be > 0"))
 	}
 	if *interval <= 0 {
-		fail(errors.New("invalid -interval value; must be > 0"))
+		fail(errors.New("invalid -interval value, must be > 0"))
 	}
 
 	words, err := loadWords(*wordlistPath)
@@ -139,7 +152,7 @@ func main() {
 func usage() {
 	out := flag.CommandLine.Output()
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  diceware -i <wordlist-file> [-n <count>] [-w <words>] [-interval <duration>] [-once] [-plain]")
+	fmt.Fprintln(out, "  diceware -i <wordlist-file|-> [-n <count>] [-w <words>] [-interval <duration>] [-once] [-plain]")
 	fmt.Fprintln(out, "  diceware -h")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -229,22 +242,13 @@ func writePlain(w io.Writer, phrases []string) error {
 }
 
 func fadeTransition(t theme, f frame, next []string) {
-	ramp := []color.Color{
-		lipgloss.Color("255"),
-		lipgloss.Color("252"),
-		lipgloss.Color("249"),
-		lipgloss.Color("246"),
-		lipgloss.Color("243"),
-		lipgloss.Color("240"),
-	}
-
-	for _, c := range ramp {
+	for _, c := range t.fadeRamp {
 		f.phraseColor = c
 		renderScreen(t.render(f))
 		time.Sleep(70 * time.Millisecond)
 	}
 	f.passphrases = next
-	for _, c := range slices.Backward(ramp) {
+	for _, c := range slices.Backward(t.fadeRamp) {
 		f.phraseColor = c
 		renderScreen(t.render(f))
 		time.Sleep(70 * time.Millisecond)
@@ -330,7 +334,7 @@ func (t theme) render(f frame) string {
 
 	fg := f.phraseColor
 	if fg == nil {
-		fg = defaultPhraseFG
+		fg = t.phraseFG
 	}
 	styled := t.phrase.Foreground(fg)
 	for i, p := range f.passphrases {
@@ -341,22 +345,50 @@ func (t theme) render(f frame) string {
 	return t.container.Render(strings.Join(lines, "\n"))
 }
 
+const (
+	stdinArg  = "-"
+	stdinName = "standard input"
+)
+
 func loadWords(path string) ([]string, error) {
+	if path == stdinArg {
+		info, err := os.Stdin.Stat()
+		if err != nil {
+			return nil, fmt.Errorf("stat %s: %w", stdinName, err)
+		}
+		if err := checkPipedStdin(info.Mode()); err != nil {
+			return nil, err
+		}
+		return readWords(os.Stdin, stdinName)
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open wordlist %q: %w", path, err)
 	}
 	defer f.Close()
 
+	return readWords(f, fmt.Sprintf("%q", path))
+}
+
+// Without this, "-i -" on a terminal blocks on the keyboard with nothing drawn.
+func checkPipedStdin(mode os.FileMode) error {
+	if mode&os.ModeCharDevice == 0 {
+		return nil
+	}
+	return fmt.Errorf("-i %s reads the wordlist from %s, but %s is a terminal. Pipe or redirect a wordlist in", stdinArg, stdinName, stdinName)
+}
+
+func readWords(r io.Reader, name string) ([]string, error) {
 	words := make([]string, 0, 8192)
-	s := bufio.NewScanner(f)
+	s := bufio.NewScanner(r)
 
 	lineNo := 0
 	for s.Scan() {
 		lineNo++
 		word, err := parseWord(s.Text(), lineNo)
 		if err != nil {
-			return nil, fmt.Errorf("parse wordlist %q: %w", path, err)
+			return nil, fmt.Errorf("parse wordlist %s: %w", name, err)
 		}
 		if word == "" {
 			continue
@@ -364,10 +396,10 @@ func loadWords(path string) ([]string, error) {
 		words = append(words, word)
 	}
 	if err := s.Err(); err != nil {
-		return nil, fmt.Errorf("scan wordlist %q: %w", path, err)
+		return nil, fmt.Errorf("scan wordlist %s: %w", name, err)
 	}
 	if len(words) == 0 {
-		return nil, errors.New("wordlist is empty")
+		return nil, fmt.Errorf("wordlist %s is empty", name)
 	}
 
 	return words, nil
@@ -379,11 +411,12 @@ func parseWord(line string, lineNo int) (string, error) {
 		return "", nil
 	}
 
-	if code, wordPart, ok := strings.Cut(trimmed, "\t"); ok {
+	// Cut before trimming: trimming first turns "11111\t" into the word "11111".
+	if code, wordPart, ok := strings.Cut(line, "\t"); ok {
 		if strings.ContainsRune(wordPart, '\t') {
 			return "", fmt.Errorf("line %d has invalid tab format", lineNo)
 		}
-		if !isDiceCode(code) {
+		if !isDiceCode(strings.TrimSpace(code)) {
 			return "", fmt.Errorf("line %d has invalid dice code", lineNo)
 		}
 		word := strings.TrimSpace(wordPart)
@@ -393,7 +426,7 @@ func parseWord(line string, lineNo int) (string, error) {
 		return word, nil
 	}
 
-	if strings.ContainsAny(trimmed, " \t") {
+	if strings.ContainsRune(trimmed, ' ') {
 		return "", fmt.Errorf("line %d is not a supported format", lineNo)
 	}
 

@@ -2,7 +2,7 @@
 
 A modern TUI-inspired [Diceware](https://en.wikipedia.org/wiki/Diceware) passphrase generator written in Go with [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 
-<img src="./demo.gif" alt="The live view drawing seven fresh Basque passphrases every two seconds" style="width:100%; max-width:900px;" />
+<img src="./demo.gif" alt="Diceware Demo" style="width:100%; max-width:900px;" />
 
 ## Installation
 
@@ -30,8 +30,8 @@ $ diceware -i wordlists/wordlist-basque-diceware.txt -n 7 -interval 2s
 ## Usage
 
 ```bash
-diceware -i <wordlist-file> [flags]
-  -i          path to the wordlist file           (required)
+diceware -i <wordlist-file|-> [flags]
+  -i          wordlist file, or - for stdin       (required)
   -n          number of passphrases to generate   (default 1)
   -w          number of words per passphrase      (default 6)
   -interval   refresh interval in live mode       (default 5s)
