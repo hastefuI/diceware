@@ -13,6 +13,12 @@ $ go build -o diceware ./cmd/diceware
 $ go install ./cmd/diceware
 ```
 
+### Docker
+
+```bash
+$ docker build -t diceware .
+```
+
 ### Verify Installation
 
 ```bash
