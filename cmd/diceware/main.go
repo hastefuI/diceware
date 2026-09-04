@@ -9,6 +9,7 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"io"
 	"math"
 	"os"
 	"os/signal"
@@ -70,6 +71,7 @@ func main() {
 	wordCount := flag.Int("w", defaultWordCount, "number of words per passphrase")
 	interval := flag.Duration("interval", 5*time.Second, "refresh interval in live mode")
 	once := flag.Bool("once", false, "generate once and exit")
+	plain := flag.Bool("plain", false, "print only the passphrases, one per line, and exit (implies -once)")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -92,6 +94,17 @@ func main() {
 	words, err := loadWords(*wordlistPath)
 	if err != nil {
 		fail(err)
+	}
+
+	if *plain {
+		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount)
+		if err != nil {
+			fail(err)
+		}
+		if err := writePlain(os.Stdout, phrases); err != nil {
+			fail(err)
+		}
+		return
 	}
 
 	command := buildDisplayCommand(*wordlistPath, *passphraseCount, *wordCount, *interval, *once)
@@ -126,7 +139,7 @@ func main() {
 func usage() {
 	out := flag.CommandLine.Output()
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  diceware -i <wordlist-file> [-n <count>] [-w <words>] [-interval <duration>] [-once]")
+	fmt.Fprintln(out, "  diceware -i <wordlist-file> [-n <count>] [-w <words>] [-interval <duration>] [-once] [-plain]")
 	fmt.Fprintln(out, "  diceware -h")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -204,6 +217,15 @@ func generatePassphraseList(words []string, passphraseCount int, wordCount int) 
 		out[i] = strings.Join(phrase, " ")
 	}
 	return out, nil
+}
+
+func writePlain(w io.Writer, phrases []string) error {
+	for _, p := range phrases {
+		if _, err := fmt.Fprintln(w, p); err != nil {
+			return fmt.Errorf("write passphrase: %w", err)
+		}
+	}
+	return nil
 }
 
 func fadeTransition(t theme, f frame, next []string) {

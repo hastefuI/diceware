@@ -36,6 +36,7 @@ diceware -i <wordlist-file> [flags]
   -w          number of words per passphrase      (default 6)
   -interval   refresh interval in live mode       (default 5s)
   -once       generate once and exit              (default false)
+  -plain      print only the passphrases and exit (default false)
   -h          print help and exit
 ```
 
