@@ -1,10 +1,7 @@
 package main
 
 import (
-	"bufio"
 	"context"
-	"crypto/rand"
-	"encoding/binary"
 	"errors"
 	"flag"
 	"fmt"
@@ -19,6 +16,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
+	"github.com/hastefuI/diceware"
 )
 
 const (
@@ -115,7 +113,7 @@ func main() {
 	}
 
 	if *plain || !isTerminal(os.Stdout) {
-		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount, *separator)
+		phrases, err := diceware.GenerateList(words, *passphraseCount, *wordCount, *separator)
 		if err != nil {
 			fail(err)
 		}
@@ -128,7 +126,7 @@ func main() {
 	command := buildDisplayCommand(*wordlistPath, *passphraseCount, *wordCount, *interval, *separator, *once)
 	t := newTheme()
 	if *once {
-		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount, *separator)
+		phrases, err := diceware.GenerateList(words, *passphraseCount, *wordCount, *separator)
 		if err != nil {
 			fail(err)
 		}
@@ -177,7 +175,7 @@ func runLive(
 	hideCursor()
 	defer showCursor()
 
-	current, err := generatePassphraseList(words, passphraseCount, wordCount, separator)
+	current, err := diceware.GenerateList(words, passphraseCount, wordCount, separator)
 	if err != nil {
 		return err
 	}
@@ -206,7 +204,7 @@ func runLive(
 		case <-refreshTimer.C:
 			nowCountdown := countdownHint(0)
 			draw(nowCountdown, current)
-			next, err := generatePassphraseList(words, passphraseCount, wordCount, separator)
+			next, err := diceware.GenerateList(words, passphraseCount, wordCount, separator)
 			if err != nil {
 				return err
 			}
@@ -220,22 +218,6 @@ func runLive(
 			refreshTimer.Reset(interval)
 		}
 	}
-}
-
-func generatePassphraseList(words []string, passphraseCount int, wordCount int, separator string) ([]string, error) {
-	if passphraseCount <= 0 {
-		return nil, errors.New("passphrase count must be > 0")
-	}
-
-	out := make([]string, passphraseCount)
-	for i := range out {
-		phrase, err := generatePassphrase(words, wordCount)
-		if err != nil {
-			return nil, err
-		}
-		out[i] = strings.Join(phrase, separator)
-	}
-	return out, nil
 }
 
 func checkSeparator(separator string) error {
@@ -374,24 +356,18 @@ const (
 )
 
 func loadWords(path string) ([]string, error) {
-	if path == stdinArg {
-		info, err := os.Stdin.Stat()
-		if err != nil {
-			return nil, fmt.Errorf("stat %s: %w", stdinName, err)
-		}
-		if err := checkPipedStdin(info.Mode()); err != nil {
-			return nil, err
-		}
-		return readWords(os.Stdin, stdinName)
+	if path != stdinArg {
+		return diceware.LoadWords(path)
 	}
 
-	f, err := os.Open(path)
+	info, err := os.Stdin.Stat()
 	if err != nil {
-		return nil, fmt.Errorf("open wordlist %q: %w", path, err)
+		return nil, fmt.Errorf("stat %s: %w", stdinName, err)
 	}
-	defer f.Close()
-
-	return readWords(f, fmt.Sprintf("%q", path))
+	if err := checkPipedStdin(info.Mode()); err != nil {
+		return nil, err
+	}
+	return diceware.ReadWords(os.Stdin, stdinName)
 }
 
 // Without this, "-i -" on a terminal blocks on the keyboard with nothing drawn.
@@ -412,113 +388,6 @@ func isTerminal(f *os.File) bool {
 
 func isTerminalMode(mode os.FileMode) bool {
 	return mode&os.ModeCharDevice != 0
-}
-
-func readWords(r io.Reader, name string) ([]string, error) {
-	words := make([]string, 0, 8192)
-	s := bufio.NewScanner(r)
-
-	lineNo := 0
-	for s.Scan() {
-		lineNo++
-		word, err := parseWord(s.Text(), lineNo)
-		if err != nil {
-			return nil, fmt.Errorf("parse wordlist %s: %w", name, err)
-		}
-		if word == "" {
-			continue
-		}
-		words = append(words, word)
-	}
-	if err := s.Err(); err != nil {
-		return nil, fmt.Errorf("scan wordlist %s: %w", name, err)
-	}
-	if len(words) == 0 {
-		return nil, fmt.Errorf("wordlist %s is empty", name)
-	}
-
-	return words, nil
-}
-
-func parseWord(line string, lineNo int) (string, error) {
-	trimmed := strings.TrimSpace(line)
-	if trimmed == "" {
-		return "", nil
-	}
-
-	// Cut before trimming: trimming first turns "11111\t" into the word "11111".
-	if code, wordPart, ok := strings.Cut(line, "\t"); ok {
-		if strings.ContainsRune(wordPart, '\t') {
-			return "", fmt.Errorf("line %d has invalid tab format", lineNo)
-		}
-		if !isDiceCode(strings.TrimSpace(code)) {
-			return "", fmt.Errorf("line %d has invalid dice code", lineNo)
-		}
-		word := strings.TrimSpace(wordPart)
-		if word == "" {
-			return "", fmt.Errorf("line %d has empty word", lineNo)
-		}
-		return word, nil
-	}
-
-	if strings.ContainsRune(trimmed, ' ') {
-		return "", fmt.Errorf("line %d is not a supported format", lineNo)
-	}
-
-	return trimmed, nil
-}
-
-func isDiceCode(s string) bool {
-	if len(s) != 5 {
-		return false
-	}
-	for _, r := range s {
-		if r < '1' || r > '6' {
-			return false
-		}
-	}
-	return true
-}
-
-func generatePassphrase(words []string, count int) ([]string, error) {
-	if len(words) == 0 {
-		return nil, errors.New("no words available")
-	}
-	if count <= 0 {
-		return nil, fmt.Errorf("invalid word count %d", count)
-	}
-
-	out := make([]string, count)
-
-	for i := range out {
-		n, err := secureRandomIndex(len(words))
-		if err != nil {
-			return nil, fmt.Errorf("secure random index: %w", err)
-		}
-		out[i] = words[n]
-	}
-
-	return out, nil
-}
-
-func secureRandomIndex(limit int) (int, error) {
-	if limit <= 0 {
-		return 0, errors.New("limit must be > 0")
-	}
-
-	n := uint64(limit)
-	bound := (math.MaxUint64 / n) * n
-	var buf [8]byte
-
-	for {
-		if _, err := rand.Read(buf[:]); err != nil {
-			return 0, err
-		}
-		v := binary.LittleEndian.Uint64(buf[:])
-		if v < bound {
-			return int(v % n), nil
-		}
-	}
 }
 
 func fail(err error) {

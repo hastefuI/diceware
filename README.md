@@ -1,4 +1,4 @@
-# Diceware [![Build](https://github.com/hastefuI/diceware/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hastefuI/diceware/actions/workflows/ci.yml) [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hastefuI/diceware/blob/main/LICENSE)
+# Diceware [![Build](https://github.com/hastefuI/diceware/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hastefuI/diceware/actions/workflows/ci.yml) [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hastefuI/diceware/blob/main/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/hastefuI/diceware.svg)](https://pkg.go.dev/github.com/hastefuI/diceware)
 
 A modern TUI-inspired [Diceware](https://en.wikipedia.org/wiki/Diceware) passphrase generator written in Go with [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 
@@ -57,6 +57,37 @@ diceware -i <wordlist-file|-> [flags]
 When standard output is not a terminal the live view is skipped and only the
 passphrases are printed, so a pipe or a redirect behaves like `-plain` without
 the flag. Colors follow [NO_COLOR](https://no-color.org/).
+
+## Library
+
+The wordlist reader and the generator are importable without the CLI:
+
+```bash
+$ go get github.com/hastefuI/diceware
+```
+
+```go
+package main
+
+import (
+	"fmt"
+
+	"github.com/hastefuI/diceware"
+)
+
+func main() {
+	words, err := diceware.LoadWords("wordlists/wordlist-basque-diceware.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	phrases, err := diceware.GenerateList(words, 1, 6, " ")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(phrases[0])
+}
+```
 
 ## Motivation
 
