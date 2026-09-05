@@ -1,4 +1,4 @@
-# Diceware [![Build](https://github.com/hastefuI/diceware/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hastefuI/diceware/actions/workflows/ci.yml) [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hastefuI/diceware/blob/main/LICENSE) [![Go Reference](https://pkg.go.dev/badge/github.com/hastefuI/diceware.svg)](https://pkg.go.dev/github.com/hastefuI/diceware)
+# Diceware [![Build](https://github.com/hastefuI/diceware/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hastefuI/diceware/actions/workflows/ci.yml) [![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev) [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/hastefuI/diceware/blob/main/LICENSE) [![Go Reference](https://pkg.go.dev/badge/go.hasteful.org/diceware.svg)](https://pkg.go.dev/go.hasteful.org/diceware)
 
 A modern TUI-inspired [Diceware](https://en.wikipedia.org/wiki/Diceware) passphrase generator written in Go with [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 
@@ -63,7 +63,7 @@ the flag. Colors follow [NO_COLOR](https://no-color.org/).
 The wordlist reader and the generator are importable without the CLI:
 
 ```bash
-$ go get github.com/hastefuI/diceware
+$ go get go.hasteful.org/diceware
 ```
 
 ```go
@@ -72,7 +72,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/hastefuI/diceware"
+	"go.hasteful.org/diceware"
 )
 
 func main() {

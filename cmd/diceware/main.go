@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
-	"github.com/hastefuI/diceware"
+	"go.hasteful.org/diceware"
 )
 
 const (

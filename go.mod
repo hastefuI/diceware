@@ -1,4 +1,4 @@
-module github.com/hastefuI/diceware
+module go.hasteful.org/diceware
 
 go 1.27
 
