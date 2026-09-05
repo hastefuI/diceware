@@ -33,6 +33,13 @@ Generate passphrases:
 $ diceware -i wordlists/wordlist-basque-diceware.txt -n 7 -interval 2s
 ```
 
+Join the words with something other than a space:
+
+```bash
+$ diceware -i wordlists/wordlist-basque-diceware.txt -sep - -plain
+malko-beira-soldadu-plastifikatu-ekuazio-datxa
+```
+
 ## Usage
 
 ```bash
@@ -40,6 +47,7 @@ diceware -i <wordlist-file|-> [flags]
   -i          wordlist file, or - for stdin       (required)
   -n          number of passphrases to generate   (default 1)
   -w          number of words per passphrase      (default 6)
+  -sep        string placed between words         (default " ")
   -interval   refresh interval in live mode       (default 5s)
   -once       generate once and exit              (default false)
   -plain      print only the passphrases and exit (default false)

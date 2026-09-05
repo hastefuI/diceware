@@ -222,7 +222,7 @@ func TestGeneratePassphraseList(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := generatePassphraseList(words, tt.passphraseCount, tt.wordCount)
+			got, err := generatePassphraseList(words, tt.passphraseCount, tt.wordCount, defaultSeparator)
 			if tt.wantErr {
 				if err == nil {
 					t.Fatalf("generatePassphraseList(%d, %d) = %q, want error", tt.passphraseCount, tt.wordCount, got)
@@ -245,6 +245,78 @@ func TestGeneratePassphraseList(t *testing.T) {
 						t.Errorf("phrase %q contains %q, which is not in the wordlist", phrase, w)
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestGeneratePassphraseListSeparator(t *testing.T) {
+	words := effWords()
+
+	separators := []struct {
+		name      string
+		separator string
+	}{
+		{name: "space", separator: defaultSeparator},
+		{name: "hyphen", separator: "-"},
+		{name: "dot", separator: "."},
+		{name: "multiple characters", separator: " :: "},
+		{name: "empty", separator: ""},
+	}
+
+	for _, tt := range separators {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := generatePassphraseList(words, 1, defaultWordCount, tt.separator)
+			if err != nil {
+				t.Fatalf("generatePassphraseList: %v", err)
+			}
+
+			if tt.separator == "" {
+				if strings.ContainsAny(got[0], " -.:") {
+					t.Errorf("phrase %q holds a separator, want the words joined directly", got[0])
+				}
+				return
+			}
+
+			parts := strings.Split(got[0], tt.separator)
+			if len(parts) != defaultWordCount {
+				t.Fatalf("phrase %q split into %d parts, want %d", got[0], len(parts), defaultWordCount)
+			}
+			for _, w := range parts {
+				if !slices.Contains(words, w) {
+					t.Errorf("phrase %q contains %q, which is not in the wordlist", got[0], w)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckSeparator(t *testing.T) {
+	tests := []struct {
+		name      string
+		separator string
+		wantErr   bool
+	}{
+		{name: "space", separator: defaultSeparator},
+		{name: "hyphen", separator: "-"},
+		{name: "empty", separator: ""},
+		{name: "tab", separator: "\t"},
+		{name: "newline", separator: "\n", wantErr: true},
+		{name: "carriage return", separator: "\r", wantErr: true},
+		{name: "newline inside a longer separator", separator: " |\n| ", wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkSeparator(tt.separator)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("checkSeparator(%q) = nil, want error", tt.separator)
+				}
+				return
+			}
+			if err != nil {
+				t.Errorf("checkSeparator(%q) = %v, want nil", tt.separator, err)
 			}
 		})
 	}

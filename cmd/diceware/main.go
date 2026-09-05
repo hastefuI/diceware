@@ -25,6 +25,7 @@ const (
 	defaultPassphraseCount = 1
 	defaultWordCount       = 6
 	defaultInterval        = 5 * time.Second
+	defaultSeparator       = " "
 )
 
 const bannerArt = `
@@ -83,6 +84,7 @@ func main() {
 	passphraseCount := flag.Int("n", defaultPassphraseCount, "number of passphrases to generate")
 	wordCount := flag.Int("w", defaultWordCount, "number of words per passphrase")
 	interval := flag.Duration("interval", defaultInterval, "refresh interval in live mode")
+	separator := flag.String("sep", defaultSeparator, "string placed between the words of a passphrase")
 	once := flag.Bool("once", false, "generate once and exit")
 	plain := flag.Bool("plain", false, "print only the passphrases, one per line, and exit (implies -once)")
 	flag.Usage = usage
@@ -103,6 +105,9 @@ func main() {
 	if *interval <= 0 {
 		fail(errors.New("invalid -interval value, must be > 0"))
 	}
+	if err := checkSeparator(*separator); err != nil {
+		fail(err)
+	}
 
 	words, err := loadWords(*wordlistPath)
 	if err != nil {
@@ -110,7 +115,7 @@ func main() {
 	}
 
 	if *plain {
-		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount)
+		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount, *separator)
 		if err != nil {
 			fail(err)
 		}
@@ -120,10 +125,10 @@ func main() {
 		return
 	}
 
-	command := buildDisplayCommand(*wordlistPath, *passphraseCount, *wordCount, *interval, *once)
+	command := buildDisplayCommand(*wordlistPath, *passphraseCount, *wordCount, *interval, *separator, *once)
 	t := newTheme()
 	if *once {
-		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount)
+		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount, *separator)
 		if err != nil {
 			fail(err)
 		}
@@ -144,7 +149,7 @@ func main() {
 		command:    command,
 		staticHint: staticRefreshHint(*interval),
 	}
-	if err := runLive(ctx, t, base, words, *passphraseCount, *wordCount, *interval); err != nil {
+	if err := runLive(ctx, t, base, words, *passphraseCount, *wordCount, *separator, *interval); err != nil {
 		fail(err)
 	}
 }
@@ -152,7 +157,7 @@ func main() {
 func usage() {
 	out := flag.CommandLine.Output()
 	fmt.Fprintln(out, "Usage:")
-	fmt.Fprintln(out, "  diceware -i <wordlist-file|-> [-n <count>] [-w <words>] [-interval <duration>] [-once] [-plain]")
+	fmt.Fprintln(out, "  diceware -i <wordlist-file|-> [-n <count>] [-w <words>] [-sep <string>] [-interval <duration>] [-once] [-plain]")
 	fmt.Fprintln(out, "  diceware -h")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -166,12 +171,13 @@ func runLive(
 	words []string,
 	passphraseCount int,
 	wordCount int,
+	separator string,
 	interval time.Duration,
 ) error {
 	hideCursor()
 	defer showCursor()
 
-	current, err := generatePassphraseList(words, passphraseCount, wordCount)
+	current, err := generatePassphraseList(words, passphraseCount, wordCount, separator)
 	if err != nil {
 		return err
 	}
@@ -200,7 +206,7 @@ func runLive(
 		case <-refreshTimer.C:
 			nowCountdown := countdownHint(0)
 			draw(nowCountdown, current)
-			next, err := generatePassphraseList(words, passphraseCount, wordCount)
+			next, err := generatePassphraseList(words, passphraseCount, wordCount, separator)
 			if err != nil {
 				return err
 			}
@@ -216,7 +222,7 @@ func runLive(
 	}
 }
 
-func generatePassphraseList(words []string, passphraseCount int, wordCount int) ([]string, error) {
+func generatePassphraseList(words []string, passphraseCount int, wordCount int, separator string) ([]string, error) {
 	if passphraseCount <= 0 {
 		return nil, errors.New("passphrase count must be > 0")
 	}
@@ -227,9 +233,16 @@ func generatePassphraseList(words []string, passphraseCount int, wordCount int) 
 		if err != nil {
 			return nil, err
 		}
-		out[i] = strings.Join(phrase, " ")
+		out[i] = strings.Join(phrase, separator)
 	}
 	return out, nil
+}
+
+func checkSeparator(separator string) error {
+	if strings.ContainsAny(separator, "\r\n") {
+		return errors.New("invalid -sep value, must not contain a line break")
+	}
+	return nil
 }
 
 func writePlain(w io.Writer, phrases []string) error {
@@ -291,7 +304,14 @@ func staticRefreshHint(interval time.Duration) string {
 	return fmt.Sprintf("Interactive mode. Passphrases will rotate every %s. Press Ctrl+C to exit.", interval)
 }
 
-func buildDisplayCommand(wordlistPath string, passphraseCount int, wordCount int, interval time.Duration, once bool) string {
+func buildDisplayCommand(
+	wordlistPath string,
+	passphraseCount int,
+	wordCount int,
+	interval time.Duration,
+	separator string,
+	once bool,
+) string {
 	command := fmt.Sprintf(
 		"go run ./cmd/diceware -i %s -n %d -w %d -interval %s",
 		wordlistPath,
@@ -299,6 +319,9 @@ func buildDisplayCommand(wordlistPath string, passphraseCount int, wordCount int
 		wordCount,
 		interval,
 	)
+	if separator != defaultSeparator {
+		command += fmt.Sprintf(" -sep %q", separator)
+	}
 	if once {
 		command += " -once"
 	}
