@@ -204,6 +204,42 @@ func TestCheckPipedStdin(t *testing.T) {
 	}
 }
 
+func TestIsTerminalMode(t *testing.T) {
+	tests := []struct {
+		name string
+		mode os.FileMode
+		want bool
+	}{
+		{name: "pipe", mode: os.ModeNamedPipe},
+		{name: "redirected file", mode: 0o644},
+		{name: "socket", mode: os.ModeSocket},
+		{name: "terminal", mode: os.ModeCharDevice | os.ModeDevice | 0o620, want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isTerminalMode(tt.mode); got != tt.want {
+				t.Errorf("isTerminalMode(%v) = %t, want %t", tt.mode, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsTerminalPipe(t *testing.T) {
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	t.Cleanup(func() {
+		r.Close()
+		w.Close()
+	})
+
+	if isTerminal(w) {
+		t.Error("isTerminal(pipe) = true, want false")
+	}
+}
+
 func TestGeneratePassphraseList(t *testing.T) {
 	words := effWords()
 

@@ -114,7 +114,7 @@ func main() {
 		fail(err)
 	}
 
-	if *plain {
+	if *plain || !isTerminal(os.Stdout) {
 		phrases, err := generatePassphraseList(words, *passphraseCount, *wordCount, *separator)
 		if err != nil {
 			fail(err)
@@ -396,10 +396,22 @@ func loadWords(path string) ([]string, error) {
 
 // Without this, "-i -" on a terminal blocks on the keyboard with nothing drawn.
 func checkPipedStdin(mode os.FileMode) error {
-	if mode&os.ModeCharDevice == 0 {
+	if !isTerminalMode(mode) {
 		return nil
 	}
 	return fmt.Errorf("-i %s reads the wordlist from %s, but %s is a terminal. Pipe or redirect a wordlist in", stdinArg, stdinName, stdinName)
+}
+
+func isTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return isTerminalMode(info.Mode())
+}
+
+func isTerminalMode(mode os.FileMode) bool {
+	return mode&os.ModeCharDevice != 0
 }
 
 func readWords(r io.Reader, name string) ([]string, error) {

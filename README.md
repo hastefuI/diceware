@@ -54,6 +54,10 @@ diceware -i <wordlist-file|-> [flags]
   -h          print help and exit
 ```
 
+When standard output is not a terminal the live view is skipped and only the
+passphrases are printed, so a pipe or a redirect behaves like `-plain` without
+the flag. Colors follow [NO_COLOR](https://no-color.org/).
+
 ## Motivation
 
 <a href="https://xkcd.com/936/" title="Password Strength by xkcd"><img src="./xkcd-936.svg" width="550"></a>
