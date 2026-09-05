@@ -22,7 +22,7 @@ $ docker build -t diceware .
 ### Verify Installation
 
 ```bash
-$ diceware -h
+$ diceware -version
 ```
 
 ## Quick Start
@@ -51,6 +51,7 @@ diceware -i <wordlist-file|-> [flags]
   -interval   refresh interval in live mode       (default 5s)
   -once       generate once and exit              (default false)
   -plain      print only the passphrases and exit (default false)
+  -version    print the version and exit
   -h          print help and exit
 ```
 

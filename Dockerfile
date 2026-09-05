@@ -1,5 +1,7 @@
-FROM golang:1.27-bookworm AS build
+FROM golang:1.27.1-trixie AS build
 WORKDIR /src
+
+ARG VERSION=dev
 
 COPY go.mod go.sum ./
 RUN go mod download
@@ -7,10 +9,10 @@ RUN go mod download
 COPY diceware.go ./
 COPY cmd ./cmd
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
-    go build -trimpath -ldflags="-s -w" -o /out/diceware ./cmd/diceware
+RUN CGO_ENABLED=0 GOOS=linux \
+    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/diceware ./cmd/diceware
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian13:nonroot
 WORKDIR /app
 
 COPY --from=build /out/diceware /app/diceware

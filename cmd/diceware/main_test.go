@@ -148,6 +148,27 @@ func TestWritePlainError(t *testing.T) {
 	}
 }
 
+func TestWriteVersion(t *testing.T) {
+	var b strings.Builder
+	if err := writeVersion(&b); err != nil {
+		t.Fatalf("writeVersion: %v", err)
+	}
+	if got, want := b.String(), version+"\n"; got != want {
+		t.Errorf("writeVersion wrote %q, want %q", got, want)
+	}
+	if version == "" {
+		t.Error("version is empty, a build from source should report a placeholder")
+	}
+}
+
+func TestWriteVersionError(t *testing.T) {
+	sentinel := errors.New("boom")
+	err := writeVersion(failingWriter{err: sentinel})
+	if !errors.Is(err, sentinel) {
+		t.Fatalf("writeVersion error = %v, want one wrapping %v", err, sentinel)
+	}
+}
+
 type failingWriter struct {
 	err error
 }

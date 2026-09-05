@@ -19,6 +19,8 @@ import (
 	"go.hasteful.org/diceware"
 )
 
+var version = "dev"
+
 const (
 	defaultPassphraseCount = 1
 	defaultWordCount       = 6
@@ -85,11 +87,18 @@ func main() {
 	separator := flag.String("sep", defaultSeparator, "string placed between the words of a passphrase")
 	once := flag.Bool("once", false, "generate once and exit")
 	plain := flag.Bool("plain", false, "print only the passphrases, one per line, and exit (implies -once)")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Usage = usage
 	flag.Parse()
 
 	if flag.NArg() != 0 {
 		fail(fmt.Errorf("unexpected argument: %s", strings.Join(flag.Args(), " ")))
+	}
+	if *showVersion {
+		if err := writeVersion(os.Stdout); err != nil {
+			fail(err)
+		}
+		return
 	}
 	if strings.TrimSpace(*wordlistPath) == "" {
 		fail(errors.New("missing required -i <wordlist-file|->"))
@@ -156,6 +165,7 @@ func usage() {
 	out := flag.CommandLine.Output()
 	fmt.Fprintln(out, "Usage:")
 	fmt.Fprintln(out, "  diceware -i <wordlist-file|-> [-n <count>] [-w <words>] [-sep <string>] [-interval <duration>] [-once] [-plain]")
+	fmt.Fprintln(out, "  diceware -version")
 	fmt.Fprintln(out, "  diceware -h")
 	fmt.Fprintln(out)
 	fmt.Fprintln(out, "Options:")
@@ -223,6 +233,13 @@ func runLive(
 func checkSeparator(separator string) error {
 	if strings.ContainsAny(separator, "\r\n") {
 		return errors.New("invalid -sep value, must not contain a line break")
+	}
+	return nil
+}
+
+func writeVersion(w io.Writer) error {
+	if _, err := fmt.Fprintln(w, version); err != nil {
+		return fmt.Errorf("write version: %w", err)
 	}
 	return nil
 }
