@@ -90,6 +90,15 @@ func main() {
 }
 ```
 
+## Wordlists
+
+If you're interested in using your own wordlists with diceware, the [EFF wordlists](https://www.eff.org/deeplinks/2016/07/new-wordlists-random-passphrases) are a good starting point:
+
+```bash
+$ curl -fsSL https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt | diceware -i - -w 6 -plain
+freeing dispose unaware amicably implosion wieldable
+```
+
 ## Motivation
 
 <a href="https://xkcd.com/936/" title="Password Strength by xkcd"><img src="./xkcd-936.svg" width="550"></a>
